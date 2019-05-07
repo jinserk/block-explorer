@@ -2,18 +2,22 @@ import React, { Fragment, useContext, useState, useEffect } from 'react';
 import { Segment, Container, Header, Table, Grid, Button, Icon } from 'semantic-ui-react';
 import { utils } from 'ethers';
 import SortedSet from 'collections/sorted-set';
+import math from 'math';
 
 import { NetworkContext, useInterval } from './Common';
 
-const blockNumbers = new SortedSet();
-const blocks = [];
+const history = {
+  numBlocks: 100,
+  blockNumbers: new SortedSet(),
+  blocks: [],
+}
 
 export function eventUnregister(provider) {
   if (provider) {
     provider.removeAllListeners('block');
   }
-  blockNumbers.clear();
-  blocks.clear();
+  history.blockNumbers.clear();
+  history.blocks.clear();
 }
 
 const shortHash = (str) => {
@@ -34,15 +38,16 @@ function BlockEventHandler() {
 
   useEffect(() => {
     provider.on('block', blockNumber => {
-      if (!blockNumbers.has(blockNumber)) {
-        blockNumbers.add(blockNumber);
+      if (!history.blockNumbers.has(blockNumber)) {
+        history.blockNumbers.add(blockNumber);
         provider.getBlock(blockNumber).then(block => {
-          blocks.push(block);
-          blocks.sort((b1, b2) => (b1.number - b2.number));
-          if (blocks.length > 10) {
-            blockNumbers.shift();
-            blocks.shift();
+          history.blocks.push(block);
+          history.blocks.sort((b1, b2) => (b1.number - b2.number));
+          if (history.blocks.length > history.numBlocks) {
+            history.blockNumbers.shift();
+            history.blocks.shift();
           }
+          // for re-rendering
           setState(blockNumber);
         });
       }
@@ -55,21 +60,25 @@ function BlockEventHandler() {
       <Table singleline='true'>
         <Table.Header>
           <Table.Row>
-            <Table.HeaderCell>number</Table.HeaderCell>
-            <Table.HeaderCell>hash</Table.HeaderCell>
-            <Table.HeaderCell>time</Table.HeaderCell>
-            <Table.HeaderCell>miner</Table.HeaderCell>
-            <Table.HeaderCell>transactions</Table.HeaderCell>
+            <Table.HeaderCell>Number</Table.HeaderCell>
+            <Table.HeaderCell>Hash</Table.HeaderCell>
+            <Table.HeaderCell>Datetime</Table.HeaderCell>
+            <Table.HeaderCell>Miner</Table.HeaderCell>
+            <Table.HeaderCell>Gas Limit</Table.HeaderCell>
+            <Table.HeaderCell>Gas Used</Table.HeaderCell>
+            <Table.HeaderCell>Transactions</Table.HeaderCell>
           </Table.Row>
         </Table.Header>
         <Table.Body>
-        { blocks.reverse().map((block, idx) => {
+        { history.blocks.slice().reverse().map((block, idx) => {
           return (
             <Table.Row key={ block.number }>
               <Table.Cell>{ block.number }</Table.Cell>
               <Table.Cell>{ shortHash(block.hash) }</Table.Cell>
               <Table.Cell>{ showDate(block.timestamp) }</Table.Cell>
               <Table.Cell>{ shortHash(block.miner) }</Table.Cell>
+              <Table.Cell>{ block.gasLimit.toString() }</Table.Cell>
+              <Table.Cell>{ block.gasUsed.toString() }</Table.Cell>
               <Table.Cell>{ block.transactions.length }</Table.Cell>
             </Table.Row>
           )
@@ -87,6 +96,9 @@ function NetworkStatus () {
   });
   const [ blockNumber, setBlockNumber ] = useState(0);
   const [ gasPrice, setGasPrice ] = useState(0);
+  const [ difficulty, setDifficulty ] = useState(0);
+  const [ hashRate, setHashRate ] = useState(0);
+  const [ tps, setTps ] = useState(0);
 
   useEffect(() => {
     setNetwork({
@@ -94,6 +106,8 @@ function NetworkStatus () {
     });
     setBlockNumber(0);
     setGasPrice(0);
+    setDifficulty(0);
+    setHashRate(0);
   }, [provider]);
 
   provider.getNetwork()
@@ -104,11 +118,22 @@ function NetworkStatus () {
     provider.getBlockNumber()
       .then(value => setBlockNumber(value))
       .catch(error => console.log(error));
+
     provider.getGasPrice()
       .then(value => {
         const price = utils.formatUnits(value, 9);
         setGasPrice(price);
       }).catch(error => console.log(error));
+
+    const numBlocks = history.blocks.length;
+    if (numBlocks > 1) {
+      const totalDifficulty = math.sum(history.blocks.map(b => b.difficulty));
+      const totalTxn = math.sum(history.blocks.map(b => b.transactions.length));
+      const timeDiff = history.blocks[numBlocks - 1].timestamp - history.blocks[0].timestamp;
+      setDifficulty(totalDifficulty / numBlocks);
+      setHashRate(totalDifficulty / timeDiff);
+      setTps(totalTxn / timeDiff);
+    }
   }
 
   useInterval(getPeriodicInfo, 4000);
@@ -117,28 +142,40 @@ function NetworkStatus () {
     <Container>
       <Header as='h2' content='Network Profile' />
       <Grid stackable={false} padded>
-        <Grid.Row columns={3}>
-          <Grid.Column width={4}>
+        <Grid.Row columns={5}>
+          <Grid.Column>
             <Header sub content='Network Name' />
             { network.name || '-' }
           </Grid.Column>
-          <Grid.Column width={4}>
+          <Grid.Column>
             <Header sub content='Network ID' />
             { network.chainId || '-' }
           </Grid.Column>
-          <Grid.Column width={8}>
-            <Header sub content='ENS Address' />
-            { network.ensAddress || '-' }
-          </Grid.Column>
-        </Grid.Row>
-        <Grid.Row columns={2}>
           <Grid.Column>
             <Header sub content='Block Number' />
             { blockNumber }
           </Grid.Column>
+          <Grid.Column columns={2}>
+            <Header sub content='ENS Address' />
+            { network.ensAddress || '-' }
+          </Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={5}>
           <Grid.Column>
             <Header sub content='Gas Price' />
             { gasPrice } gwei
+          </Grid.Column>
+          <Grid.Column>
+            <Header sub content='Difficulty' />
+            { math.round(difficulty / 1e9) / 1e3 } TH
+          </Grid.Column>
+          <Grid.Column>
+            <Header sub content='Hash Rate' />
+            { math.round(hashRate / 1e9) / 1e3 } TH/s
+          </Grid.Column>
+          <Grid.Column columns={2}>
+            <Header sub content='Tx Rate' />
+            { math.round(tps * 1e3) / 1e3 } tx/s
           </Grid.Column>
         </Grid.Row>
       </Grid>
