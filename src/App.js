@@ -1,12 +1,13 @@
-import React, { Fragment, useState } from 'react';
+import React, { useContext, Fragment, useState, useRef } from 'react';
 import { Modal, Header, Grid, Menu, Container, Form, Button, Icon } from 'semantic-ui-react';
 import { ethers } from 'ethers';
 import 'semantic-ui-css/semantic.min.css';
 
-import './App.css';
 import { INFURA_PROJECT_ID } from './Config';
+import AppMain, { eventUnregister } from './AppMain';
+import { NetworkContext } from './Common';
 
-const RPCs = [
+const networks = [
   { name:'MainNet', url: 'https://mainnet.infura.io/v3/'+INFURA_PROJECT_ID, color: 'orange' },
   { name:'Ropsten', url: 'https://ropsten.infura.io/v3/'+INFURA_PROJECT_ID, color: 'blue' },
   { name:'Rinkeby', url: 'https://rinkeby.infura.io/v3/'+INFURA_PROJECT_ID, color: 'yellow' },
@@ -14,7 +15,7 @@ const RPCs = [
   { name:'Kovan', url: 'https://kovan.infura.io/v3/'+INFURA_PROJECT_ID, color: 'green' },
 ]
 
-const rpcOptions = RPCs.map((item, idx) => {
+const networkOptions = networks.map((item, idx) => {
   return {
     key: item.name.toLowerCase(),
     value: idx,
@@ -22,18 +23,12 @@ const rpcOptions = RPCs.map((item, idx) => {
   }
 });
 
-function AppMain() {
-  return (
-    <Fragment>
-      content
-    </Fragment>
-  );
-}
+function NetworkSelector({ network, setNetwork }) {
+  const provider = useContext(NetworkContext);
 
-function NetworkSelector({ provider, current, setNetwork }) {
   const [showModal, setShowModal] = useState(false);
   const [netCategory, setNetCategory] = useState(0);
-  const [netState, setNetState] = useState(current);
+  const [netState, setNetState] = useState(network);
   const [urlError, setUrlError] = useState(false);
   const [connState, setConnState] = useState('loading');
 
@@ -41,19 +36,19 @@ function NetworkSelector({ provider, current, setNetwork }) {
     .then(() => setConnState('connected'))
     .catch(() => setConnState('error'));
 
-  const currentButton = () => {
+  const networkButton = () => {
     const label = (color) => {
       return {
         as: 'a',
         color: color,
-        content: (current.name === 'Custom') ? current.url : current.name
+        content: (network.name === 'Custom') ? network.url : network.name
       }
     }
 
     return (
       <Fragment>
       { connState === 'connected' &&
-        <Button icon='ethereum' color={current.color} labelPosition='left' label={label(current.color)}
+        <Button icon='ethereum' color={network.color} labelPosition='left' label={label(network.color)}
           onClick={() => setShowModal(true)}
         /> }
       { connState === 'error' &&
@@ -61,7 +56,7 @@ function NetworkSelector({ provider, current, setNetwork }) {
           onClick={() => setShowModal(true)}
         /> }
       { connState === 'loading' &&
-      <Button loading color={current.color} labelPosition='left' label={label(current.color)}
+      <Button loading color={network.color} labelPosition='left' label={label(network.color)}
         onClick={() => setShowModal(true)}
       /> }
       </Fragment>
@@ -69,7 +64,7 @@ function NetworkSelector({ provider, current, setNetwork }) {
   }
 
   const handleCategoryChange = (event, data) => setNetCategory(data.value);
-  const handleNetChange = (event, data) => setNetState(RPCs[data.value]);
+  const handleNetChange = (event, data) => setNetState(networks[data.value]);
   const handleUrlChange = (event, data) => setNetState({
     name: 'Custom',
     url: data.value,
@@ -90,11 +85,11 @@ function NetworkSelector({ provider, current, setNetwork }) {
 
   const net = { mainstream: 0, custom: 1 };
   return (
-    <Modal open={showModal} trigger={currentButton()} basic size='small'>
+    <Modal open={showModal} trigger={networkButton()} basic size='small'>
       <Header icon='ethereum' content='Select Network' />
       <Modal.Content>
         <Form id="123" onSubmit={handleSubmit}>
-        <Grid stackable='false' padded>
+        <Grid stackable={false} padded>
           <Grid.Row columns={2} verticalAlign='middle'>
             <Grid.Column width={3}>
               <Form.Radio
@@ -106,10 +101,10 @@ function NetworkSelector({ provider, current, setNetwork }) {
               <Form.Select
                 placeholder='Choose Network'
                 disabled={netCategory !== net.mainstream}
-                selection onChange={handleNetChange} options={rpcOptions} />
+                selection onChange={handleNetChange} options={networkOptions} />
             </Grid.Column>
           </Grid.Row>
-          <Grid.Row columns={2} textAlign='middle'>
+          <Grid.Row columns={2} verticalAlign='middle'>
             <Grid.Column width={3}>
               <Form.Radio
                 label='Custom'
@@ -141,25 +136,17 @@ function NetworkSelector({ provider, current, setNetwork }) {
 }
 
 export default function App() {
-  const [network, setNetwork] = useState(RPCs[0]);
+  const [network, setNetwork] = useState(networks[0]);
+  const provider = useRef(null);
 
-  let provider;
-  try {
-    provider = ethers.getDefaultProvider(network.name.toLowerCase());
-  } catch (e) {
-    provider = new ethers.providers.JsonRpcProvider(network.url);
-  }
+  eventUnregister(provider.current);
 
-  console.log(provider);
-  /*
-  if (network.value === 0)
-    network.value = (async () => {
-      return await provider.getNetwork();
-    })().chainId;
-  */
+  provider.current = (network.name === 'Custom')
+    ? new ethers.providers.JsonRpcProvider(network.url)
+    : ethers.getDefaultProvider(network.name.toLowerCase());
 
   return (
-    <Fragment>
+    <NetworkContext.Provider value={provider.current}>
       <Menu fixed='top' borderless inverted>
         <Container>
           <Menu.Item as='a' header>
@@ -169,15 +156,15 @@ export default function App() {
           </Menu.Item>
           <Menu.Item position='right'>
             <div style={{ marginLeft: '1em', marginRight: '1em' }}>
-              <NetworkSelector provider={provider} current={network} setNetwork={p => setNetwork(p)} />
+              <NetworkSelector network={network} setNetwork={p => setNetwork(p)} />
             </div>
           </Menu.Item>
         </Container>
       </Menu>
 
-      <Container text style={{ marginTop: '6em' }}>
+      <Container style={{ marginTop: '6em' }}>
         <AppMain />
       </Container>
-    </Fragment>
+    </NetworkContext.Provider>
   );
 }

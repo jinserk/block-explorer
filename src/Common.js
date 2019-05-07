@@ -1,5 +1,7 @@
 /* https://overreacted.io/making-setinterval-declarative-with-react-hooks/ */
-import { useState, useEffect, useRef } from 'react';
+import { createContext, useState, useEffect, useRef } from 'react';
+
+export const NetworkContext = createContext();
 
 export function useSafeEffect(callback, deps) {
   useEffect(() => {
