@@ -1,5 +1,5 @@
 import React, { useContext, Fragment, useState, useRef } from 'react';
-import { Modal, Header, Grid, Menu, Container, Form, Button, Icon } from 'semantic-ui-react';
+import { Modal, Header, Grid, Menu, Container, Popup, Form, Button, Icon } from 'semantic-ui-react';
 import { ethers } from 'ethers';
 import 'semantic-ui-css/semantic.min.css';
 
@@ -34,7 +34,7 @@ function NetworkSelector({ network, setNetwork }) {
 
   provider.getNetwork()
     .then(() => setConnState('connected'))
-    .catch(() => setConnState('error'));
+    .catch(e => setConnState(e));
 
   const networkButton = () => {
     const label = (color) => {
@@ -45,22 +45,17 @@ function NetworkSelector({ network, setNetwork }) {
       }
     }
 
-    return (
-      <Fragment>
-      { connState === 'connected' &&
-        <Button icon='ethereum' color={network.color} labelPosition='left' label={label(network.color)}
-          onClick={() => setShowModal(true)}
-        /> }
-      { connState === 'error' &&
-        <Button icon='exclamation circle' color='red' labelPosition='left' label={label('red')}
-          onClick={() => setShowModal(true)}
-        /> }
-      { connState === 'loading' &&
-      <Button loading color={network.color} labelPosition='left' label={label(network.color)}
-        onClick={() => setShowModal(true)}
-      /> }
-      </Fragment>
-    );
+    switch (connState) {
+      case 'loading':
+        return (<Button loading color={network.color} labelPosition='left' label={label(network.color)} onClick={() => setShowModal(true)} />);
+      case 'connected':
+        return (<Button icon='ethereum' color={network.color} labelPosition='left' label={label(network.color)}
+          onClick={() => setShowModal(true)} />);
+      default:
+        return (<Popup trigger={ <Button icon='exclamation circle' color='red' labelPosition='left' label={label('red')}
+          onClick={() => setShowModal(true)} /> } content='ERROR: Connection failed'
+          style = {{ color: 'red' }} />);
+    }
   }
 
   const handleCategoryChange = (event, data) => setNetCategory(data.value);
