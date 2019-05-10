@@ -1,5 +1,5 @@
-import React, { createRef, Fragment, useContext, useState, useEffect, useRef } from 'react';
-import { Segment, Container, Header, Table, Grid, Ref, Button, Icon } from 'semantic-ui-react';
+import React, { Fragment, useContext, useState, useEffect, useRef } from 'react';
+import { Modal, Container, Header, Table, Grid, List, Ref, Button, Icon } from 'semantic-ui-react';
 import { utils } from 'ethers';
 import SortedSet from 'collections/sorted-set';
 import math from 'math';
@@ -7,10 +7,12 @@ import math from 'math';
 import { NetworkContext, useInterval } from './Common';
 
 const history = {
-  numBlocks: 100,
+  numBlocks: 300,
+  showBlocks: 50,
   blockNumbers: new SortedSet(),
   blocks: [],
-  numTransactions: 100,
+  numTransactions: 5000,
+  showTransactions: 300,
   transactions: []
 }
 
@@ -35,81 +37,192 @@ const showDate = (timestamp) => {
   return date.toUTCString();
 }
 
-function TxEventHandler() {
-  return (
-    <Container>
-      <Header as='h2' content='Recent Transactions' />
-      <div style={{ height: '300px', overflow: 'auto', maxHeight: '300px' }}>
-      <Table singleline='true'>
-        <Table.Header>
-          <Table.Row>
-            <Table.HeaderCell>TxHash</Table.HeaderCell>
-            <Table.HeaderCell>BlockHash</Table.HeaderCell>
-            <Table.HeaderCell>From</Table.HeaderCell>
-            <Table.HeaderCell>To</Table.HeaderCell>
-            <Table.HeaderCell>Gas Limit</Table.HeaderCell>
-            <Table.HeaderCell>Gas Price (gwei)</Table.HeaderCell>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-        { history.transactions.slice().reverse().map((tx, idx) => {
-          if (!tx) return null;
-          return (
-            <Table.Row key={ tx.hash }>
-              <Table.Cell>{ shortHash(tx.hash) }</Table.Cell>
-              <Table.Cell>{ shortHash(tx.blockHash) }</Table.Cell>
-              <Table.Cell>{ shortHash(tx.from) }</Table.Cell>
-              <Table.Cell>{ shortHash(tx.to) }</Table.Cell>
-              <Table.Cell>{ tx.gasLimit.toString() }</Table.Cell>
-              <Table.Cell>{ utils.formatUnits(tx.gasPrice, 9) }</Table.Cell>
-            </Table.Row>
-          );
-        }) }
-        </Table.Body>
-      </Table>
-      </div>
-    </Container>
-  );
-}
+const TxDetailsModal = ({ tx }) => (
+  <Modal trigger={<Button size='tiny' compact content={ shortHash(tx.hash) } color='black' />} closeIcon>
+    <Header icon='ethereum' content={ 'Transaction ' + tx.hash } />
+    <Modal.Content scrolling>
+      <Grid container>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Block Number</Grid.Column>
+          <Grid.Column width={13}>{ tx.blockNumber }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Block Hash</Grid.Column>
+          <Grid.Column width={13}>{ tx.blockHash }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>From</Grid.Column>
+          <Grid.Column width={13}>{ tx.from }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>To</Grid.Column>
+          <Grid.Column width={13}>{ tx.to }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Nonce</Grid.Column>
+          <Grid.Column width={13}>{ tx.nonce }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Value</Grid.Column>
+          <Grid.Column width={13}>
+            { utils.formatUnits(tx.value, 9) } gwei
+            ({ utils.formatEther(tx.value) } eth)
+          </Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Gas Limit</Grid.Column>
+          <Grid.Column width={13}>{ tx.gasLimit.toString() }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Gas Price</Grid.Column>
+          <Grid.Column width={13}>{ utils.formatUnits(tx.gasPrice, 9) } gwei</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>r</Grid.Column>
+          <Grid.Column width={13}>{ tx.r }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>s</Grid.Column>
+          <Grid.Column width={13}>{ tx.s }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>v</Grid.Column>
+          <Grid.Column width={13}>{ tx.v }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Raw</Grid.Column>
+          <Grid.Column width={13}>{ tx.raw }</Grid.Column>
+        </Grid.Row>
+      </Grid>
+    </Modal.Content>
+  </Modal>
+)
 
-function BlockEventHandler() {
-  return (
-    <Container>
-      <Header as='h2' content='Recent Blocks' />
-      <div style={{ height: '300px', overflow: 'auto', maxHeight: '300px' }}>
-      <Table singleline='true'>
-        <Table.Header>
-          <Table.Row>
-            <Table.HeaderCell>Number</Table.HeaderCell>
-            <Table.HeaderCell>Hash</Table.HeaderCell>
-            <Table.HeaderCell>Datetime</Table.HeaderCell>
-            <Table.HeaderCell>Miner</Table.HeaderCell>
-            <Table.HeaderCell>Gas Limit</Table.HeaderCell>
-            <Table.HeaderCell>Gas Used</Table.HeaderCell>
-            <Table.HeaderCell>Transactions</Table.HeaderCell>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-        { history.blocks.slice().reverse().map((block, idx) => {
-          if (!block) return null;
-          return (
-            <Table.Row key={ block.number }>
-              <Table.Cell>{ block.number }</Table.Cell>
-              <Table.Cell>{ shortHash(block.hash) }</Table.Cell>
-              <Table.Cell>{ showDate(block.timestamp) }</Table.Cell>
-              <Table.Cell>{ shortHash(block.miner) }</Table.Cell>
-              <Table.Cell>{ block.gasLimit.toString() }</Table.Cell>
-              <Table.Cell>{ block.gasUsed.toString() }</Table.Cell>
-              <Table.Cell>{ block.transactions.length }</Table.Cell>
-            </Table.Row>
-          )
-        }) }
-        </Table.Body>
-      </Table>
-      </div>
-    </Container>
-  );
-}
+const TxEventHandler = () => (
+  <Container>
+    <Header as='h2' content='Recent Transactions' />
+    <div style={{ height: '300px', overflow: 'auto', maxHeight: '300px' }}>
+    <Table compact singleline='true'>
+      <Table.Header>
+        <Table.Row>
+          <Table.HeaderCell>TxHash</Table.HeaderCell>
+          <Table.HeaderCell>BlockHash</Table.HeaderCell>
+          <Table.HeaderCell>From</Table.HeaderCell>
+          <Table.HeaderCell>To</Table.HeaderCell>
+          <Table.HeaderCell>Gas Limit</Table.HeaderCell>
+          <Table.HeaderCell>Gas Price (gwei)</Table.HeaderCell>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        { history.transactions.slice().reverse()
+          .filter((tx, idx) => (idx < history.showTransactions))
+          .map((tx, idx) => {
+            if (!tx) return null;
+            return (
+              <Table.Row key={ tx.hash }>
+                <Table.Cell>
+                  <TxDetailsModal tx={ tx } />
+                </Table.Cell>
+                <Table.Cell>{ shortHash(tx.blockHash) }</Table.Cell>
+                <Table.Cell>{ shortHash(tx.from) }</Table.Cell>
+                <Table.Cell>{ shortHash(tx.to) }</Table.Cell>
+                <Table.Cell>{ tx.gasLimit.toString() }</Table.Cell>
+                <Table.Cell>{ utils.formatUnits(tx.gasPrice, 9) }</Table.Cell>
+              </Table.Row>
+            );
+          })
+        }
+      </Table.Body>
+    </Table>
+    </div>
+  </Container>
+)
+
+const BlockDetailsModal = ({ block }) => (
+  <Modal trigger={<Button size='tiny' compact content={ block.number } color='black' />} closeIcon>
+    <Header icon='ethereum' content={ 'Block ' + block.number } />
+    <Modal.Content scrolling>
+      <Grid container>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Parent Hash</Grid.Column>
+          <Grid.Column width={13}>{ block.parentHash }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Hash</Grid.Column>
+          <Grid.Column width={13}>{ block.hash }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>DateTime (UTC)</Grid.Column>
+          <Grid.Column width={13}>{ showDate(block.timestamp) }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Miner</Grid.Column>
+          <Grid.Column width={13}>{ block.miner }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Difficulty</Grid.Column>
+          <Grid.Column width={13}>{ block.difficulty }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Nonce</Grid.Column>
+          <Grid.Column width={13}>{ block.nonce }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Extra Data</Grid.Column>
+          <Grid.Column width={13}>{ block.extraData }</Grid.Column>
+        </Grid.Row>
+        <Grid.Row columns={2}>
+          <Grid.Column width={3}>Transactions</Grid.Column>
+          <Grid.Column width={13}>
+            { block.transactions.map((h) => (<Fragment key='modal-{h}'>{h} <br /></Fragment>)) }
+          </Grid.Column>
+        </Grid.Row>
+      </Grid>
+    </Modal.Content>
+  </Modal>
+)
+
+const BlockEventHandler = () => (
+  <Container>
+    <Header as='h2' content='Recent Blocks' />
+    <div style={{ height: '300px', overflow: 'auto', maxHeight: '300px' }}>
+    <Table compact singleline='true'>
+      <Table.Header>
+        <Table.Row>
+          <Table.HeaderCell>Number</Table.HeaderCell>
+          <Table.HeaderCell>Hash</Table.HeaderCell>
+          <Table.HeaderCell>Datetime</Table.HeaderCell>
+          <Table.HeaderCell>Miner</Table.HeaderCell>
+          <Table.HeaderCell>Gas Limit</Table.HeaderCell>
+          <Table.HeaderCell>Gas Used</Table.HeaderCell>
+          <Table.HeaderCell>Transactions</Table.HeaderCell>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        { history.blocks.slice().reverse()
+          .filter((block, idx) => (idx < history.showBlocks))
+          .map((block, idx) => {
+            if (!block) return null;
+            return (
+              <Table.Row key={ block.number }>
+                <Table.Cell>
+                  <BlockDetailsModal block={ block } />
+                </Table.Cell>
+                <Table.Cell>{ shortHash(block.hash) }</Table.Cell>
+                <Table.Cell>{ showDate(block.timestamp) }</Table.Cell>
+                <Table.Cell>{ shortHash(block.miner) }</Table.Cell>
+                <Table.Cell>{ block.gasLimit.toString() }</Table.Cell>
+                <Table.Cell>{ block.gasUsed.toString() }</Table.Cell>
+                <Table.Cell>{ block.transactions.length }</Table.Cell>
+              </Table.Row>
+            )
+          })
+        }
+      </Table.Body>
+    </Table>
+    </div>
+  </Container>
+)
 
 function NetworkStatus () {
   const provider = useContext(NetworkContext);
@@ -273,4 +386,3 @@ export default function AppMain() {
     </Grid>
   );
 }
-
