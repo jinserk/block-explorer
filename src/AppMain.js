@@ -119,7 +119,7 @@ const TxEventHandler = () => (
           .map((tx, idx) => {
             if (!tx) return null;
             return (
-              <Table.Row key={ tx.hash }>
+              <Table.Row>
                 <Table.Cell>
                   <TxDetailsModal tx={ tx } />
                 </Table.Cell>
@@ -174,7 +174,7 @@ const BlockDetailsModal = ({ block }) => (
         <Grid.Row columns={2}>
           <Grid.Column width={3}>Transactions</Grid.Column>
           <Grid.Column width={13}>
-            { block.transactions.map((h) => (<Fragment key='modal-{h}'>{h} <br /></Fragment>)) }
+            { block.transactions.map((h, i) => (<Fragment>{h} <br /></Fragment>)) }
           </Grid.Column>
         </Grid.Row>
       </Grid>
@@ -204,7 +204,7 @@ const BlockEventHandler = () => (
           .map((block, idx) => {
             if (!block) return null;
             return (
-              <Table.Row key={ block.number }>
+              <Table.Row>
                 <Table.Cell>
                   <BlockDetailsModal block={ block } />
                 </Table.Cell>
